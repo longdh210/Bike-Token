@@ -1,0 +1,8 @@
+{
+    "name": "BIKE",
+    "description": "Bike NFT",
+    "image": "https://gateway.pinata.cloud/ipfs/QmRvnhYrUaeHLF8hSeRNTdTVn5JTHas5eZk8Wy2RbzwRAq",
+    "external_link": "youtube.com",
+    "seller_fee_basis_points": 500,
+    "fee_recipient": "0x3797786150d38aa2588ac2BcFb162a61e2A69638"
+}
