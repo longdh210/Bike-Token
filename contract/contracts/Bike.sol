@@ -23,7 +23,7 @@ contract Bike is
 
     Counters.Counter private _tokenIdCounter;
 
-    string baseURI;
+    string public baseURI;
 
     uint256 private _fee = 0.01 ether;
 
@@ -119,6 +119,10 @@ contract Bike is
 
         string memory uri = _baseURI();
         return bytes(uri).length > 0 ? string(abi.encodePacked(uri)) : "";
+    }
+
+    function withdraw() public onlyOwner {
+        payable(msg.sender).transfer(address(this).balance);
     }
 
     function supportsInterface(bytes4 interfaceId)

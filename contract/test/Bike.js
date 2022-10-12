@@ -2,12 +2,12 @@ const { expect } = require("chai");
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 const { ethers } = require("hardhat");
 
-describe("Land contract", function () {
+describe("Bike contract", function () {
     async function deployTokenFixture() {
         const Bike = await ethers.getContractFactory("Bike");
         const [owner, addr1, addr2] = await ethers.getSigners();
 
-        const bike = await Bike.deploy(owner.address);
+        const bike = await Bike.deploy(owner.address, 100);
 
         await bike.deployed();
 
@@ -22,71 +22,66 @@ describe("Land contract", function () {
         });
     });
 
+    describe("Get and set fee", function () {
+        it("Should get fee successfully", async function () {
+            const { bike, owner, addr1, addr2 } = await loadFixture(
+                deployTokenFixture
+            );
+            // Get fee
+            expect(await bike.getFee()).to.equal(
+                ethers.utils.parseUnits("0.01", "ether")
+            );
+        });
+
+        it("Should set fee successfully", async function () {
+            const { bike, owner, addr1, addr2 } = await loadFixture(
+                deployTokenFixture
+            );
+            // Set fee
+            expect(await bike.setFee(1)).to.change;
+        });
+    });
+
+    describe("Set base uri", function () {
+        it("Should set base uri successfully", async function () {
+            const { bike, owner, addr1, addr2 } = await loadFixture(
+                deployTokenFixture
+            );
+            // Set base uri
+            expect(await bike.setBaseURI("youtube.com")).to.change;
+        });
+    });
+
+    describe("Get and set max supply", function () {
+        it("Should get max supply successfully", async function () {
+            const { bike, owner, addr1, addr2 } = await loadFixture(
+                deployTokenFixture
+            );
+            // Get max supply
+            expect(await bike.supply()).to.equal(100);
+        });
+
+        it("Should set max supply successfully", async function () {
+            const { bike, owner, addr1, addr2 } = await loadFixture(
+                deployTokenFixture
+            );
+            // Set max supply
+            expect(await bike.setTotalSupply(1000)).to.change;
+        });
+    });
+
     describe("Mint", function () {
-        it("Should revert if account don't have Preorder token", async function () {
+        it("Should mint 5 tokens successfully", async function () {
             const { bike, owner, addr1, addr2 } = await loadFixture(
                 deployTokenFixture
             );
 
             // Mint 5 preorder token to addr1
-            await expect(
-                land.safeMintMany(addr1.address, 5)
-            ).to.be.revertedWith("You have not burn Preorder token yet");
-        });
-
-        // it("Should revert if account is not token's owner", async function () {
-        //     const { land, owner, addr1, addr2 } = await loadFixture(
-        //         deployTokenFixture
-        //     );
-        //     const PreorderToken = await ethers.getContractFactory(
-        //         "PreorderToken"
-        //     );
-        //     const preorderToken = await PreorderToken.deploy(land.address);
-        //     await preorderToken.deployed();
-
-        //     await preorderToken.connect(addr1).safeMint(addr1.address, {
-        //         value: ethers.utils.parseUnits("0.1", "ether"),
-        //     });
-
-        //     await land.setPreorderContract(preorderToken.address);
-
-        //     // Mint 1 preorder token to owner
-        //     await expect(
-        //         land.connect(addr2).safeMint(addr2.address, 1)
-        //     ).to.be.revertedWith("You can not mint Land token");
-        // });
-    });
-
-    describe("Transactions", function () {
-        it("Should revert transaction (token locked 3 months)", async function () {
-            const { land, owner, addr1, addr2 } = await loadFixture(
-                deployTokenFixture
-            );
-            const PreorderToken = await ethers.getContractFactory(
-                "PreorderToken"
-            );
-            const preorderToken = await PreorderToken.deploy(
-                owner.address,
-                land.address
-            );
-            await preorderToken.deployed();
-
-            await preorderToken.connect(addr1).safeMint(addr1.address, {
-                value: ethers.utils.parseUnits("0.1", "ether"),
-            });
-
-            // Set Preorder contract address for Land contract to interact
-            await land.setPreorderContract(preorderToken.address);
-
-            // Swap (burn) token from Preorder contract
-            await preorderToken.connect(addr1).burn(1);
-
-            // Mint 1 preorder token to owner
-            await expect(
-                land
-                    .connect(addr1)
-                    .transferFrom(addr1.address, addr2.address, 1)
-            ).to.be.revertedWith("Token locked");
+            expect(
+                await bike.safeMintMany(owner.address, 5, {
+                    value: ethers.utils.parseUnits(`0.05`, "ether"),
+                })
+            ).to.changeTokenBalance(bike, owner, 5);
         });
     });
 });
