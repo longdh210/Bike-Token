@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
@@ -17,7 +18,8 @@ contract Bike is
     Pausable,
     Ownable,
     ERC721Burnable,
-    ERC721Royalty
+    ERC721Royalty,
+    ReentrancyGuard
 {
     using Counters for Counters.Counter;
 
@@ -121,7 +123,7 @@ contract Bike is
         return bytes(uri).length > 0 ? string(abi.encodePacked(uri)) : "";
     }
 
-    function withdraw() public onlyOwner {
+    function withdraw() public nonReentrant onlyOwner {
         payable(msg.sender).transfer(address(this).balance);
     }
 
