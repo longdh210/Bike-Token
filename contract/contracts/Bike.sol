@@ -2,7 +2,6 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -14,7 +13,6 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Royalty.sol";
 
 contract Bike is
     ERC721,
-    ERC721Enumerable,
     Pausable,
     Ownable,
     ERC721Burnable,
@@ -99,14 +97,6 @@ contract Bike is
         }
     }
 
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 tokenId
-    ) internal override(ERC721, ERC721Enumerable) whenNotPaused {
-        super._beforeTokenTransfer(from, to, tokenId);
-    }
-
     function _burn(uint256 tokenId) internal override(ERC721, ERC721Royalty) {
         super._burn(tokenId);
     }
@@ -130,7 +120,7 @@ contract Bike is
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC721, ERC721Enumerable, ERC721Royalty)
+        override(ERC721, ERC721Royalty)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
