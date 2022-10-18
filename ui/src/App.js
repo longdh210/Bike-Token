@@ -4,11 +4,19 @@ import Web3Modal from "web3modal";
 import { ethers } from "ethers";
 import ContractABI from "./artifacts/contracts/Bike.sol/Bike.json";
 import { bikeTokenAddress } from "./config";
-import { useEffect, useState } from "react";
+import { useEffect, useState, CSSProperties } from "react";
+import ClipLoader from "react-spinners/ClipLoader";
+
+const override: CSSProperties = {
+    display: "block",
+    margin: "0 auto",
+    borderColor: "red",
+};
 
 function App() {
     const [amount, setAmount] = useState("");
     const [currentAddress, setCurrentAddress] = useState(null);
+    let [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (window.ethereum) {
@@ -32,6 +40,7 @@ function App() {
         } else if (Number(amount) > 100) {
             alert("Mint more than allowed");
         } else {
+            setLoading(true);
             const web3modal = new Web3Modal();
             const connection = await web3modal.connect();
             const provider = new ethers.providers.Web3Provider(connection);
@@ -48,16 +57,29 @@ function App() {
                 ContractABI.abi,
                 signer
             );
-            let transaction = await contract.safeMintMany(
-                signerAddress,
-                amount,
-                {
-                    value: valuePass,
+            try {
+                let transaction = await contract.safeMintMany(
+                    signerAddress,
+                    amount,
+                    {
+                        value: valuePass,
+                    }
+                );
+                await transaction.wait();
+                let transactionData = await provider.getTransactionReceipt(
+                    transaction.hash
+                );
+                if (transactionData.status == 1) {
+                    alert("Buy token successfully");
+                } else {
+                    alert("Transaction failed");
                 }
-            );
-            await transaction.wait();
-
-            alert("Buy token successfully");
+                setLoading(false);
+            } catch (e) {
+                console.log(e);
+                alert("Transaction failed");
+                setLoading(false);
+            }
         }
     };
 
@@ -100,11 +122,20 @@ function App() {
                         color: "white",
                         fontWeight: "bold",
                     }}
-                    onClick={handleBuyClick}
+                    onClick={() => handleBuyClick()}
                 >
                     Buy Preorder NFT
                 </button>
             </div>
+            {loading ? (
+                <div className='WrapLoader'>
+                    <div className='Loader'>
+                        <ClipLoader color='#36d7b7' loading size={150} />
+                    </div>
+                </div>
+            ) : (
+                <></>
+            )}
         </div>
     );
 }
