@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC721/presets/ERC721PresetMinterPauserAutoId.sol";
@@ -17,7 +18,8 @@ contract Bike is
     Ownable,
     ERC721Burnable,
     ERC721Royalty,
-    ReentrancyGuard
+    ReentrancyGuard,
+    ERC721Enumerable
 {
     using Counters for Counters.Counter;
 
@@ -28,6 +30,8 @@ contract Bike is
     uint256 private _fee = 0.01 ether;
 
     uint256 public supply;
+
+    mapping(address => uint256[]) public token;
 
     constructor(address owner, uint256 _supply) ERC721("Bike", "BIKE") {
         super._transferOwnership(owner);
@@ -81,6 +85,7 @@ contract Bike is
         require(tokenId <= supply, "Out of supply");
         require(msg.value >= _fee, "Not enough balance");
         _safeMint(to, tokenId);
+        token[to].push(tokenId);
     }
 
     function safeMintMany(address to, uint256 amount) public payable {
@@ -94,7 +99,16 @@ contract Bike is
             _tokenIdCounter.increment();
             tokenId = _tokenIdCounter.current();
             _safeMint(to, tokenId);
+            token[to].push(tokenId);
         }
+    }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal override(ERC721, ERC721Enumerable) whenNotPaused {
+        super._beforeTokenTransfer(from, to, tokenId);
     }
 
     function _burn(uint256 tokenId) internal override(ERC721, ERC721Royalty) {
@@ -120,7 +134,7 @@ contract Bike is
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC721, ERC721Royalty)
+        override(ERC721, ERC721Royalty, ERC721Enumerable)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);

@@ -4,6 +4,7 @@ import Web3Modal from "web3modal";
 import { ethers } from "ethers";
 import ContractABI from "./artifacts/contracts/Bike.sol/Bike.json";
 import { bikeTokenAddress } from "./config";
+import { balanceOf, tokenOfOwnerByIndex } from "./components/balance";
 import { useEffect, useState, CSSProperties } from "react";
 import ClipLoader from "react-spinners/ClipLoader";
 
@@ -16,7 +17,12 @@ const override: CSSProperties = {
 function App() {
     const [amount, setAmount] = useState("");
     const [currentAddress, setCurrentAddress] = useState(null);
+    const [balance, setBalance] = useState(0);
     let [loading, setLoading] = useState(false);
+    let [token, setToken] = useState([]);
+    // let token = [];
+
+    useEffect(() => {}, [token]);
 
     useEffect(() => {
         if (window.ethereum) {
@@ -24,12 +30,34 @@ function App() {
                 .request({ method: "eth_requestAccounts" })
                 .then(async (res) => {
                     setCurrentAddress(res[0]);
+                    let balanceTemp = await balanceOf(res[0]);
+                    if (balanceTemp != undefined) {
+                        setBalance(balanceTemp);
+                    }
+                    let tokenArrayTemp = [];
+                    for (let i = 0; i < balanceTemp; i++) {
+                        let tokenTemp = await tokenOfOwnerByIndex(res[0], i);
+                        if (!tokenArrayTemp.includes(tokenTemp.toString())) {
+                            tokenArrayTemp.push(tokenTemp.toString());
+                        }
+                    }
+                    setToken(tokenArrayTemp);
                 });
         }
     }, []);
 
     window.ethereum.on("accountsChanged", async function (accounts) {
         setCurrentAddress(accounts[0]);
+        let balanceTemp = await balanceOf(accounts[0]);
+        setBalance(balanceTemp);
+        let tokenArrayTemp = [];
+        for (let i = 0; i < balanceTemp; i++) {
+            let tokenTemp = await tokenOfOwnerByIndex(accounts[0], i);
+            if (!tokenArrayTemp.includes(tokenTemp.toString())) {
+                tokenArrayTemp.push(tokenTemp.toString());
+            }
+        }
+        setToken(tokenArrayTemp);
     });
 
     const handleBuyClick = async () => {
@@ -85,6 +113,16 @@ function App() {
 
     return (
         <div className='App'>
+            <div className='balance'>
+                <label
+                    style={{
+                        color: "white",
+                        fontSize: "30px",
+                    }}
+                >
+                    Bike token id own: {token.toString()}
+                </label>
+            </div>
             <div className='content'>
                 <h1
                     style={{
