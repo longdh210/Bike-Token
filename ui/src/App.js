@@ -7,175 +7,212 @@ import { bikeTokenAddress } from "./config";
 import { balanceOf, tokenOfOwnerByIndex } from "./components/balance";
 import { useEffect, useState, CSSProperties } from "react";
 import ClipLoader from "react-spinners/ClipLoader";
-
-const override: CSSProperties = {
-    display: "block",
-    margin: "0 auto",
-    borderColor: "red",
-};
+import CoinbaseWalletSDK from "@coinbase/wallet-sdk";
+import WalletConnectProvider from "@walletconnect/web3-provider";
 
 function App() {
-    const [amount, setAmount] = useState("");
-    const [currentAddress, setCurrentAddress] = useState(null);
-    const [balance, setBalance] = useState(0);
-    let [loading, setLoading] = useState(false);
-    let [token, setToken] = useState([]);
-    // let token = [];
+  const [amount, setAmount] = useState("");
+  let [loading, setLoading] = useState(false);
+  let [token, setToken] = useState([]);
+  const [connectedAccount, setConnectedAccount] = useState(null);
+  const [web3Provider, setWeb3Provider] = useState(null);
 
-    useEffect(() => {}, [token]);
+  let web3Modal = new Web3Modal({
+    network: "goerli",
+    cacheProvider: false, // optional
+    providerOptions: {
+      binancechainwallet: {
+        package: true,
+      },
+      coinbasewallet: {
+        package: CoinbaseWalletSDK, // Required
+        options: {
+          appName: "a2cfc47d9a4f408ea304fef5b70e5599", // Required
+          infuraId: process.env.INFURA_ID, // Required
+          chainId: 4,
+        },
+      },
+      walletconnect: {
+        package: WalletConnectProvider,
+        options: {
+          infuraId: "a2cfc47d9a4f408ea304fef5b70e5599",
+        },
+      },
+    }, // required
+  });
 
-    useEffect(() => {
-        if (window.ethereum) {
-            window.ethereum
-                .request({ method: "eth_requestAccounts" })
-                .then(async (res) => {
-                    setCurrentAddress(res[0]);
-                    let balanceTemp = await balanceOf(res[0]);
-                    if (balanceTemp != undefined) {
-                        setBalance(balanceTemp);
-                    }
-                    let tokenArrayTemp = [];
-                    for (let i = 0; i < balanceTemp; i++) {
-                        let tokenTemp = await tokenOfOwnerByIndex(res[0], i);
-                        if (!tokenArrayTemp.includes(tokenTemp.toString())) {
-                            tokenArrayTemp.push(tokenTemp.toString());
-                        }
-                    }
-                    setToken(tokenArrayTemp);
-                });
-        }
-    }, []);
-
-    window.ethereum.on("accountsChanged", async function (accounts) {
-        setCurrentAddress(accounts[0]);
-        let balanceTemp = await balanceOf(accounts[0]);
-        setBalance(balanceTemp);
+  window.ethereum.on("accountsChanged", async function (accounts) {
+    if (web3Provider != null) {
+      setConnectedAccount(accounts[0]);
+      let balanceTemp = await balanceOf(accounts[0]);
+      if (balanceTemp > 0) {
         let tokenArrayTemp = [];
         for (let i = 0; i < balanceTemp; i++) {
-            let tokenTemp = await tokenOfOwnerByIndex(accounts[0], i);
-            if (!tokenArrayTemp.includes(tokenTemp.toString())) {
-                tokenArrayTemp.push(tokenTemp.toString());
-            }
+          let tokenTemp = await tokenOfOwnerByIndex(accounts[0], i);
+          if (!tokenArrayTemp.includes(tokenTemp.toString())) {
+            tokenArrayTemp.push(tokenTemp.toString());
+          }
         }
-        setToken(tokenArrayTemp);
-    });
+        await setToken(tokenArrayTemp);
+      }
+    }
+  });
 
-    const handleBuyClick = async () => {
-        if (isNaN(amount)) {
-            alert("Please enter number !");
-        } else if (!amount) {
-            alert("Enter amount");
-        } else if (Number(amount) > 100) {
-            alert("Mint more than allowed");
+  const connectWallet = async () => {
+    try {
+      const web3ModalInstance = await web3Modal.connect();
+      const web3ModalProvider = new ethers.providers.Web3Provider(
+        web3ModalInstance
+      );
+      if (web3ModalProvider) {
+        setWeb3Provider(web3ModalProvider);
+      }
+      setConnectedAccount(web3ModalProvider.provider.selectedAddress);
+      let balanceTemp = await balanceOf(
+        web3ModalProvider.provider.selectedAddress
+      );
+      if (balanceTemp.toString() > 0) {
+        let tokenArrayTemp = [];
+        for (let i = 0; i < balanceTemp; i++) {
+          let tokenTemp = await tokenOfOwnerByIndex(
+            web3ModalProvider.provider.selectedAddress,
+            i
+          );
+          if (!tokenArrayTemp.includes(tokenTemp.toString())) {
+            tokenArrayTemp.push(tokenTemp.toString());
+          }
+        }
+        await setToken(tokenArrayTemp);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const disconnectWallet = async () => {
+    await web3Modal.clearCachedProvider();
+    setWeb3Provider(null);
+    setConnectedAccount(null);
+  };
+
+  const handleBuyClick = async () => {
+    if (isNaN(amount)) {
+      alert("Please enter number !");
+    } else if (!amount) {
+      alert("Enter amount");
+    } else if (Number(amount) > 100) {
+      alert("Mint more than allowed");
+    } else {
+      setLoading(true);
+      const web3modal = new Web3Modal();
+      const connection = await web3modal.connect();
+      const provider = new ethers.providers.Web3Provider(connection);
+      const signer = provider.getSigner();
+      const signerAddress = await signer.getAddress();
+
+      const valueAmount = 0.01 * amount;
+
+      let valuePass = ethers.utils.parseUnits(`${valueAmount}`, "ether");
+      valuePass = valuePass.toString();
+
+      let contract = new ethers.Contract(
+        bikeTokenAddress,
+        ContractABI.abi,
+        signer
+      );
+      try {
+        let transaction = await contract.safeMintMany(signerAddress, amount, {
+          value: valuePass,
+        });
+        await transaction.wait();
+        let transactionData = await provider.getTransactionReceipt(
+          transaction.hash
+        );
+        if (transactionData.status == 1) {
+          alert("Buy token successfully");
         } else {
-            setLoading(true);
-            const web3modal = new Web3Modal();
-            const connection = await web3modal.connect();
-            const provider = new ethers.providers.Web3Provider(connection);
-            const signer = provider.getSigner();
-            const signerAddress = await signer.getAddress();
-
-            const valueAmount = 0.01 * amount;
-
-            let valuePass = ethers.utils.parseUnits(`${valueAmount}`, "ether");
-            valuePass = valuePass.toString();
-
-            let contract = new ethers.Contract(
-                bikeTokenAddress,
-                ContractABI.abi,
-                signer
-            );
-            try {
-                let transaction = await contract.safeMintMany(
-                    signerAddress,
-                    amount,
-                    {
-                        value: valuePass,
-                    }
-                );
-                await transaction.wait();
-                let transactionData = await provider.getTransactionReceipt(
-                    transaction.hash
-                );
-                if (transactionData.status == 1) {
-                    alert("Buy token successfully");
-                } else {
-                    alert("Transaction failed");
-                }
-                setLoading(false);
-            } catch (e) {
-                console.log(e);
-                alert("Transaction failed");
-                setLoading(false);
-            }
+          alert("Transaction failed");
         }
-    };
+        setLoading(false);
+      } catch (e) {
+        console.log(e);
+        alert("Transaction failed");
+        setLoading(false);
+      }
+    }
+  };
 
-    return (
-        <div className='App'>
-            <div className='balance'>
-                <label
-                    style={{
-                        color: "white",
-                        fontSize: "30px",
-                    }}
-                >
-                    Bike token id own: {token.toString()}
-                </label>
-            </div>
-            <div className='content'>
-                <h1
-                    style={{
-                        color: "white",
-                        fontSize: "100px",
-                    }}
-                >
-                    Preorder Bike Token
-                </h1>
-                <br></br>
-                <h2
-                    style={{
-                        color: "white",
-                    }}
-                >
-                    Hi: {currentAddress}
-                </h2>
-                <br></br>
-                <input
-                    placeholder='Amount of token want to buy'
-                    style={{
-                        height: "30px",
-                        width: "200px",
-                    }}
-                    onChange={(e) => setAmount(e.target.value)}
-                ></input>
-                <br></br>
-                <button
-                    style={{
-                        height: "60px",
-                        width: "120px",
-                        background: "#4DC1BF",
-                        borderRadius: "10px",
-                        marginTop: "10px",
-                        color: "white",
-                        fontWeight: "bold",
-                    }}
-                    onClick={() => handleBuyClick()}
-                >
-                    Buy Preorder NFT
-                </button>
-            </div>
-            {loading ? (
-                <div className='WrapLoader'>
-                    <div className='Loader'>
-                        <ClipLoader color='#36d7b7' loading size={150} />
-                    </div>
-                </div>
-            ) : (
-                <></>
-            )}
+  return (
+    <div className='App'>
+      <div className='balance'>
+        <label
+          style={{
+            color: "white",
+            fontSize: "30px",
+          }}
+        >
+          Bike token id own: {token.toString()}
+        </label>
+      </div>
+      <div className='content'>
+        <h1
+          style={{
+            color: "white",
+            fontSize: "100px",
+          }}
+        >
+          Preorder Bike Token
+        </h1>
+        <br></br>
+        {web3Provider == null ? (
+          <button onClick={connectWallet}>Connect Wallet</button>
+        ) : (
+          <button onClick={disconnectWallet}>Disconnect</button>
+        )}
+        <br></br>
+        <h2
+          style={{
+            color: "white",
+          }}
+        >
+          Hi: {connectedAccount != null ? connectedAccount : ""}
+        </h2>
+        <br></br>
+        <input
+          placeholder='Amount of token want to buy'
+          style={{
+            height: "30px",
+            width: "200px",
+          }}
+          onChange={(e) => setAmount(e.target.value)}
+        ></input>
+        <br></br>
+        <button
+          style={{
+            height: "60px",
+            width: "120px",
+            background: "#4DC1BF",
+            borderRadius: "10px",
+            marginTop: "10px",
+            color: "white",
+            fontWeight: "bold",
+          }}
+          onClick={() => handleBuyClick()}
+        >
+          Buy Preorder NFT
+        </button>
+      </div>
+      {loading ? (
+        <div className='WrapLoader'>
+          <div className='Loader'>
+            <ClipLoader color='#36d7b7' loading size={150} />
+          </div>
         </div>
-    );
+      ) : (
+        <></>
+      )}
+    </div>
+  );
 }
 
 export default App;
