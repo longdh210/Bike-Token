@@ -16,6 +16,7 @@ function App() {
   let [token, setToken] = useState([]);
   const [connectedAccount, setConnectedAccount] = useState(null);
   const [web3Provider, setWeb3Provider] = useState(null);
+  const [itemId, setItemId] = useState(null);
 
   let web3Modal = new Web3Modal({
     network: "goerli",
@@ -121,9 +122,14 @@ function App() {
         signer
       );
       try {
-        let transaction = await contract.safeMintMany(signerAddress, amount, {
-          value: valuePass,
-        });
+        let transaction = await contract.safeMintMany(
+          Number(itemId),
+          signerAddress,
+          amount,
+          {
+            value: valuePass,
+          }
+        );
         await transaction.wait();
         let transactionData = await provider.getTransactionReceipt(
           transaction.hash
@@ -136,10 +142,16 @@ function App() {
         setLoading(false);
       } catch (e) {
         console.log(e);
-        alert("Transaction failed");
+        alert(e.reason);
         setLoading(false);
       }
     }
+  };
+
+  const handleChangeItemName = (e) => {
+    let { name, value } = e.target;
+    console.log(name, value);
+    setItemId(value);
   };
 
   return (
@@ -177,6 +189,37 @@ function App() {
         >
           Hi: {connectedAccount != null ? connectedAccount : ""}
         </h2>
+        <br></br>
+        <br></br>
+        <div>
+          <h3
+            style={{
+              color: "white",
+            }}
+          >
+            Item name
+          </h3>
+          <select
+            id='item-name'
+            name='item-name'
+            style={{
+              height: "30px",
+              width: "200px",
+            }}
+            onChange={handleChangeItemName}
+          >
+            <option value='0'>Zero Livery</option>
+            <option value='1'>Collab Skin 1</option>
+            <option value='2'>Collab Skin 2</option>
+            <option value='3'>Midas</option>
+            <option value='4'>Hayate Corporate Skin</option>
+            <option value='5'>Tiffany Blue</option>
+            <option value='6'>Candy Crush</option>
+            <option value='7'>Dracula Red</option>
+            <option value='8'>Cold Steel</option>
+            <option value='9'>White</option>
+          </select>
+        </div>
         <br></br>
         <input
           placeholder='Amount of token want to buy'

@@ -1,3 +1,3 @@
-const bikeTokenAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+const bikeTokenAddress = "0x1A9679ED9299435C94f5Adc57310C79aA1b3F9f0"
         module.exports = { bikeTokenAddress };
         

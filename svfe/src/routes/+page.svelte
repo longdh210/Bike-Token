@@ -3,95 +3,190 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 
-	// Third -party dependencies
+	// Blockchain dependencies
+	import {
+		chain,
+		chainId,
+		configureChains,
+		createClient,
+		getAccount,
+		getContract,
+		fetchBalance,
+		watchAccount,
+		watchContractEvent,
+		watchNetwork,
+		watchProvider,
+		watchSigner,
+		watchReadContract,
+		Connector
+	} from '@wagmi/core';
+	import { infuraProvider } from "@wagmi/core/providers/infura";
+	import type {Chain} from '@wagmi/core';
+	import { jsonRpcProvider } from '@wagmi/core/providers/jsonRpc';
+	import { ClientCtrl, ConfigCtrl, ModalCtrl, CoreHelpers } from '@web3modal/core';
+	import { EthereumClient, modalConnectors, walletConnectProvider } from '@web3modal/ethereum';
+	import { MetaMaskConnector } from '@wagmi/core/connectors/metaMask'
+	import { W3mModal, W3mCoreButton } from '@web3modal/ui';
 	import { BigNumber, ethers } from 'ethers';
 
-	// External files from the contract project
-	import { bikeTokenAddress } from '$lib/config.js';
-	import ContractABI from '$lib/artifacts/contracts/Bike.sol/Bike.json';
+	// External files from the contract build output
+	// NOTE: the _sepolia folder and config contain information for the contract deployed on sepolia testnet
+	import { bikeTokenAddress } from '$lib/config_sepolia.js';
+	import ContractABI from '$lib/artifacts_sepolia/contracts/Bike.sol/Bike.json';
 
-	let currentAddress: any = null;
-	let currentBalance: any = 0;
-	let tokens: any[] = [];
-
-	let showModalConnectWallet = false;
+	// UI
+	let mounted = false;
 	let showModalProcessing = false;
 
-	let balanceOf = async (address: any) => {
-		const provider = new ethers.providers.Web3Provider(window.ethereum);
-		const contract = new ethers.Contract(bikeTokenAddress, ContractABI.abi, provider);
+	// Blockchain related
+	let currentAddress: `0x${string}` | undefined = undefined;
+	let currentSigner: ethers.Signer | undefined = undefined;
+	let currentChain: number | undefined = undefined;
+	let contract: ethers.Contract | undefined = undefined;
+	let currentTokens: string[] = [];
 
-		let result = await contract.balanceOf(address);
-		return result;
-	};
+	// 1. Consts.
+	// TODO: dynamically change the chain array in dev vs release
+	const infuraId = 'a2cfc47d9a4f408ea304fef5b70e5599';
+	const walletConnectId = '8eaeb6b52ea88b798c2b1905d1411a64';
+	const chains = [chain.localhost, chain.goerli, chain.sepolia];
 
-	let tokenOfOwnerByIndex = async (address: any, index: any) => {
-		const provider = new ethers.providers.Web3Provider(window.ethereum);
-		const contract = new ethers.Contract(bikeTokenAddress, ContractABI.abi, provider);
+	// 2. Configure wagmi client
+	const { provider } = configureChains(chains, [
+		jsonRpcProvider({
+			rpc: (chain) => ({
+				http: 'http://127.0.0.1:8545'
+			})
+		}),
+		infuraProvider({ infuraId }),
+		walletConnectProvider({ projectId: walletConnectId })
+	]);
 
-		let result = await contract.tokenOfOwnerByIndex(address, index);
-		return result;
-	};
+	const wagmiClient = createClient({
+		autoConnect: true,
+		connectors: modalConnectors({ appName: 'web3Modal', chains}),
+		provider
+	});
+
+	// 3. Configure ethereum client
+	const ethereumClient = new EthereumClient(wagmiClient, chains);
+
+	// 4. Configure modal and pass ethereum client to it
+	ConfigCtrl.setConfig({
+		projectId: walletConnectId,
+		theme: 'dark',
+		accentColor: 'default'
+	});
+
+	ClientCtrl.setEthereumClient(ethereumClient);
+
+	watchAccount(async (data) => {
+		console.log('watchAccount cb', data);
+
+		if (data.isConnecting) {
+			// TODO What do we need to do here?
+		}
+
+		if (data.isConnected) {
+			currentAddress = data.address;
+			currentChain = await data.connector?.getChainId();
+		}
+
+		if (data.isDisconnected) {
+			currentAddress = undefined;
+			currentSigner = undefined;
+			currentChain = undefined;
+			contract = undefined;
+			currentTokens = [];
+
+			// TODO any further clean up
+		}
+	});
+
+	const handleWatchSigner = (chain: Chain, result: ethers.Signer | null) => {
+		if (result !== null) {
+			if (chain.id == currentChain) {
+				currentSigner = result;
+				contract = new ethers.Contract(bikeTokenAddress, ContractABI.abi, currentSigner);
+
+				console.log('assign currentSigner', chain, currentSigner);
+				console.log('contract', contract);
+
+				getAccountItems();
+			}
+		}
+	}
+
+	// NOTE: Added a bunch of watch calls here for convenience during debug
+	watchSigner({ chainId: chainId.mainnet }, (result) => {
+		handleWatchSigner(chain.mainnet, result);
+	});
+
+	watchSigner({ chainId: chainId.localhost }, (result) => {
+		handleWatchSigner(chain.localhost, result);
+	});
+
+	watchSigner({ chainId: chainId.goerli }, (result) => {
+		handleWatchSigner(chain.goerli, result);
+	});
+
+	watchSigner({ chainId: chainId.sepolia }, (result) => {
+		handleWatchSigner(chain.sepolia, result);
+	});
 
 	let getAccountItems = async () => {
-		window.ethereum.request({ method: 'eth_requestAccounts' }).then(async (res: string[]) => {
-            debugger;
-			currentAddress = res[0];
-			let tempBalance = (await balanceOf(currentAddress)) as BigNumber;
+		// NOTE: Ideally this should never happen,
+		// as we should only call this function after a wallet has been succesfully connected.
+		if (currentAddress === undefined) {
+			alert('Please connect a wallet!');
+			return;
+		}
 
-			if (typeof tempBalance == 'undefined') {
-				throw new Error('undefined balance');
+		let balance = await contract!.balanceOf(currentAddress);
+		let tokens: string[] = [];
+
+		for (let i = 0; i < balance; i++) {
+			let tmp = await contract!.tokenOfOwnerByIndex(currentAddress, i);
+			let tmpStr = tmp.toString();
+
+			if (!tokens.includes(tmpStr)) {
+				tokens.push(tmpStr);
 			}
+		}
 
-			currentBalance = tempBalance;
+		currentTokens = tokens;
 
-			let tempTokens: String[] = [];
-
-			for (let i = 0; i < currentBalance; i++) {
-				let tokenTemp = (await tokenOfOwnerByIndex(currentAddress, i)).toString();
-				if (!tempTokens.includes(tokenTemp)) {
-					tempTokens.push(tokenTemp);
-				}
-			}
-
-			tokens = tempTokens;
-		});
+		console.log('Got balance', balance);
 	};
 
-    let handleConnect = async () => {
-        await getAccountItems();
-    }
-
 	let handleBuy = async () => {
+		// NOTE: Ideally this should never happen,
+		// as we should only call this function after a wallet has been succesfully connected.
+		if (currentAddress === undefined) {
+			alert('Please connect a wallet!');
+			return;
+		}
+
 		showModalProcessing = true;
-		// const web3modal = new Web3Modal();
-		// const connection = await web3modal.connect();
 
-		// A Web3Provider wraps a standard Web3 provider, which is
-		// what MetaMask injects as window.ethereum into each page
-		const provider = new ethers.providers.Web3Provider(window.ethereum);
-
-		// MetaMask requires requesting permission to connect users accounts
-		await provider.send('eth_requestAccounts', []);
-
-		const signer = provider.getSigner();
-		const signerAddress = await signer.getAddress();
+		const signerAddress = await currentSigner?.getAddress();
+		console.log('signerAddress', signerAddress);
 
 		let amount = 1;
 		const valueAmount = 0.01 * amount;
 
 		let valuePass = ethers.utils.parseUnits(`${valueAmount}`, 'ether').toString();
 
-		let contract = new ethers.Contract(bikeTokenAddress, ContractABI.abi, signer);
-
 		try {
-			let transaction = await contract.safeMintMany(signerAddress, amount, {
+			let transaction = await contract!.safeMintMany(signerAddress, amount, {
 				value: valuePass
 			});
-			await transaction.wait();
-			let transactionData = await provider.getTransactionReceipt(transaction.hash);
-            debugger;
-			if (transactionData.status == 1) {
+
+			let result = await transaction.wait();
+
+			console.log('result', result);
+
+			if (result.status == 1) {
 				alert('Buy token successfully');
 				await getAccountItems();
 			} else {
@@ -105,17 +200,42 @@
 		}
 	};
 
-	onMount(() => {});
+	onMount(() => {
+		console.log('onMount');
+
+		// debugger;
+		mounted = true;
+	});
+
+	onDestroy(() => {
+		mounted = false;
+	});
 </script>
 
-<div>
-	<button on:click={handleConnect}>Connect</button>
-	<button on:click={handleBuy}>Buy</button>
+<!-- NOTE: Why is this conditional block needed? -->
+<!-- Without this, the UI elements will initiate before the config code finish running, causing error. -->
+{#if mounted}
+	<div>
+		<w3m-core-button />
+		<w3m-modal />
+	</div>
+{/if}
+
+<div class="my-2">
+	<button
+		class="px-2 border border-1 bg-gray-400"
+		disabled={currentAddress === undefined}
+		on:click={handleBuy}>Buy</button
+	>
 </div>
 
 {#if showModalProcessing}
-	<div class="">Processing...</div>
+	<div class="my-2">Processing...</div>
 {/if}
 
-<div>Items owned: {tokens.join(', ')}</div>
-<div class="">Other content goes here.</div>
+<div class="grid grid-cols-1 gap-2">
+	<div>Address: {currentAddress !== undefined ? currentAddress : 'Not connected.'}</div>
+	<div>Chain: {currentChain != undefined ? currentChain : 'Not connected.'}</div>
+	<div>Items owned: {currentTokens.join(', ')}</div>
+	<div class="">Other content goes here.</div>
+</div>
