@@ -1,1 +1,1 @@
-export const bikeTokenAddress = "0x1A9679ED9299435C94f5Adc57310C79aA1b3F9f0"
+export const bikeTokenAddress = "0x875Fcbec64805280E7Be5f8d6E6c63f60B04493b"

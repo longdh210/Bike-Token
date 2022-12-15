@@ -190,7 +190,6 @@ function App() {
           Hi: {connectedAccount != null ? connectedAccount : ""}
         </h2>
         <br></br>
-        <br></br>
         <div>
           <h3
             style={{

@@ -1,1 +1,1 @@
-export const bikeTokenAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+export const bikeTokenAddress = '0x875Fcbec64805280E7Be5f8d6E6c63f60B04493b';

@@ -44,6 +44,7 @@
 	let currentChain: number | undefined = undefined;
 	let contract: ethers.Contract | undefined = undefined;
 	let currentTokens: string[] = [];
+	let itemId: number = 0;
 
 	// 1. Consts.
 	// TODO: dynamically change the chain array in dev vs release
@@ -159,6 +160,12 @@
 		console.log('Got balance', balance);
 	};
 
+	const handleChangeItemName = (e: any) => {
+    let { name, value } = e.target;
+    	console.log(name, value);
+    	itemId = value;
+  	};
+
 	let handleBuy = async () => {
 		// NOTE: Ideally this should never happen,
 		// as we should only call this function after a wallet has been succesfully connected.
@@ -178,9 +185,14 @@
 		let valuePass = ethers.utils.parseUnits(`${valueAmount}`, 'ether').toString();
 
 		try {
-			let transaction = await contract!.safeMintMany(signerAddress, amount, {
-				value: valuePass
-			});
+			let transaction = await contract!.safeMintMany(
+          		itemId,
+          		signerAddress,
+          		amount,
+				{
+					value: valuePass,
+				}
+        	);
 
 			let result = await transaction.wait();
 
@@ -218,6 +230,28 @@
 	<div>
 		<w3m-core-button />
 		<w3m-modal />
+		<div>
+			<h3
+			>
+			  Item name
+			</h3>
+			<select
+			  id='item-name'
+			  name='item-name'
+			  on:change={handleChangeItemName}
+			>
+			  <option value='0'>Zero Livery</option>
+			  <option value='1'>Collab Skin 1</option>
+			  <option value='2'>Collab Skin 2</option>
+			  <option value='3'>Midas</option>
+			  <option value='4'>Hayate Corporate Skin</option>
+			  <option value='5'>Tiffany Blue</option>
+			  <option value='6'>Candy Crush</option>
+			  <option value='7'>Dracula Red</option>
+			  <option value='8'>Cold Steel</option>
+			  <option value='9'>White</option>
+			</select>
+		  </div>
 	</div>
 {/if}
 
