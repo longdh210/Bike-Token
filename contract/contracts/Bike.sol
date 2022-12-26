@@ -43,9 +43,6 @@ contract Bike is
 
     Item[] public items;
 
-    mapping(string => uint256) public itemNameToAmount;
-    mapping(string => uint256) public itemIdToId;
-
     constructor(address owner) ERC721("Bike", "BIKE") {
         super._transferOwnership(owner);
         baseURI = "https://gateway.pinata.cloud/ipfs/QmNVtHFqBeQDu5giyc9rzxAPzR5yhuuw2hoGvFyPBRdRxu/";
@@ -102,10 +99,6 @@ contract Bike is
         address to,
         uint256 amount
     ) public payable {
-        // require(
-        //     (_tokenIdCounter.current() + amount) <= supply,
-        //     "Out of supply"
-        // );
         require(amount <= items[index].quantity, "Out of supply");
         require(msg.value >= amount * _fee, "Not enough balance");
         string memory uri;
